@@ -3,7 +3,6 @@ local M = {}
 local config = {
 	cmds = {},
 	ui = {
-		wincmd = false,
 		autosave = false,
 		border = "none",
 		height = 0.8,
@@ -16,13 +15,12 @@ local config = {
 	},
 }
 
-local function floatingWin(cmd)
-	M.buf = vim.api.nvim_create_buf(false, true)
-	local win_height = math.ceil(vim.api.nvim_get_option("lines") * config.ui.height - 4)
+function M._get_config()
+	local win_height = math.ceil(vim.api.nvim_get_option("lines") * config.ui.height)
 	local win_width = math.ceil(vim.api.nvim_get_option("columns") * config.ui.width)
-	local row = math.ceil((vim.api.nvim_get_option("lines") - win_height) * config.ui.y - 1)
+	local row = math.ceil((vim.api.nvim_get_option("lines") - win_height) * config.ui.y - 2)
 	local col = math.ceil((vim.api.nvim_get_option("columns") - win_width) * config.ui.x)
-	local opts = {
+	return {
 		style = "minimal",
 		relative = "editor",
 		border = config.ui.border,
@@ -31,6 +29,11 @@ local function floatingWin(cmd)
 		row = row,
 		col = col,
 	}
+end
+
+local function floatingWin(cmd)
+	M.buf = vim.api.nvim_create_buf(false, true)
+	local opts = M._get_config()
 	M.win = vim.api.nvim_open_win(M.buf, true, opts)
 	vim.api.nvim_buf_set_option(M.buf, "filetype", "Compile")
 	vim.api.nvim_buf_set_keymap(
@@ -55,6 +58,16 @@ function M.setup(user_options)
 	config = vim.tbl_deep_extend("force", config, user_options)
 end
 
+local function update_float()
+	vim.api.nvim_create_autocmd("VimResized", {
+		callback = function()
+			vim.api.nvim_win_set_config(M.win, M._get_config())
+		end,
+	})
+end
+
+M.run = false
+
 function M.compile()
 	local cmd = config.cmds[vim.bo.filetype]
 	if cmd ~= nil then
@@ -77,6 +90,10 @@ function M.compile()
 			vim.cmd("write")
 		end
 		floatingWin(cmd)
+		if not M.run then
+			update_float()
+			M.run = true
+		end
 	else
 		vim.cmd("echohl ErrorMsg | echo 'Error: Invalid command' | echohl None")
 	end
