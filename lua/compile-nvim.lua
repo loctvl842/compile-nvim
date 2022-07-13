@@ -9,13 +9,13 @@ local config = {
 		width = 0.8,
 		x = 0.5,
 		y = 0.5,
-		border_hl = "FloatBorder",
+		border_hl = "Normal",
 		normal_hl = "Normal",
 		blend = 0,
 	},
 }
 
-function M._get_config()
+function M._get_win_config()
 	local win_height = math.ceil(vim.api.nvim_get_option("lines") * config.ui.height)
 	local win_width = math.ceil(vim.api.nvim_get_option("columns") * config.ui.width)
 	local row = math.ceil((vim.api.nvim_get_option("lines") - win_height) * config.ui.y - 2)
@@ -31,9 +31,21 @@ function M._get_config()
 	}
 end
 
-local function floatingWin(cmd)
+local function update_float()
+	vim.api.nvim_create_autocmd("VimResized", {
+		callback = function()
+			vim.api.nvim_win_set_config(M.win, M._get_win_config())
+		end,
+	})
+end
+
+local function on_vim_resize()
+	update_float()
+end
+
+local function createFloatingWin(cmd)
 	M.buf = vim.api.nvim_create_buf(false, true)
-	local opts = M._get_config()
+	local opts = M._get_win_config()
 	M.win = vim.api.nvim_open_win(M.buf, true, opts)
 	vim.api.nvim_buf_set_option(M.buf, "filetype", "Compile")
 	vim.api.nvim_buf_set_keymap(
@@ -52,21 +64,12 @@ local function floatingWin(cmd)
 		"Normal:" .. config.ui.normal_hl .. ",FloatBorder:" .. config.ui.border_hl
 	)
 	vim.api.nvim_win_set_option(M.win, "winblend", config.ui.blend)
+	on_vim_resize()
 end
 
 function M.setup(user_options)
 	config = vim.tbl_deep_extend("force", config, user_options)
 end
-
-local function update_float()
-	vim.api.nvim_create_autocmd("VimResized", {
-		callback = function()
-			vim.api.nvim_win_set_config(M.win, M._get_config())
-		end,
-	})
-end
-
-M.run = false
 
 function M.compile()
 	local cmd = config.cmds[vim.bo.filetype]
@@ -89,11 +92,7 @@ function M.compile()
 		if config.ui.autosave then
 			vim.cmd("write")
 		end
-		floatingWin(cmd)
-		if not M.run then
-			update_float()
-			M.run = true
-		end
+		createFloatingWin(cmd)
 	else
 		vim.cmd("echohl ErrorMsg | echo 'Error: Invalid command' | echohl None")
 	end
